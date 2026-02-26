@@ -1,7 +1,6 @@
 package jwtauth_test
 
 import (
-	"context"
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
@@ -15,8 +14,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
-	"github.com/lestrrat-go/jwx/v2/jwa"
-	"github.com/lestrrat-go/jwx/v2/jwt"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/lestrrat-go/jwx/v3/transform"
 )
 
 var (
@@ -26,25 +26,33 @@ var (
 	TokenAuthRS256 *jwtauth.JWTAuth
 
 	PrivateKeyRS256String = `-----BEGIN RSA PRIVATE KEY-----
-MIIBOwIBAAJBALxo3PCjFw4QjgOX06QCJIJBnXXNiEYwDLxxa5/7QyH6y77nCRQy
-J3x3UwF9rUD0RCsp4sNdX5kOQ9PUyHyOtCUCAwEAAQJARjFLHtuj2zmPrwcBcjja
-IS0Q3LKV8pA0LoCS+CdD+4QwCxeKFq0yEMZtMvcQOfqo9x9oAywFClMSlLRyl7ng
-gQIhAOyerGbcdQxxwjwGpLS61Mprf4n2HzjwISg20cEEH1tfAiEAy9dXmgQpDPir
-C6Q9QdLXpNgSB+o5CDqfor7TTyTCovsCIQDNCfpu795luDYN+dvD2JoIBfrwu9v2
-ZO72f/pm/YGGlQIgUdRXyW9kH13wJFNBeBwxD27iBiVj0cbe8NFUONBUBmMCIQCN
-jVK4eujt1lm/m60TlEhaWBC3p+3aPT2TqFPUigJ3RQ==
+MIICXgIBAAKBgQDsH6T+WrdRLKHEhbhbnItRo7X5tj0xssOSCJUiZbCHr52XftIr
+hBD6HxbGaKUEzuaCDYGEcQZZRJ1KHfYmJtXPCz4Zp3qlhjNugvTaZoFtQ8RqiWVY
+cHqCY6cmI+3cq2mVrd7MstpXKhC8dZ2MZnzx/zqaeiV21SiwxHed8LmWmQIDAQAB
+AoGAff9I0L1hkrxJOg/M133KTe8Y3L4lG07z0wonYmp274CDjGKNDdF0KbPLOGaA
+n/czw3Qnh5+0LpBRikpAng0dC06z0YnyzrkoPPawC4s2zJeY3NnajK9IfRAAVlby
+cIJVmEL/xF3FFHhCfrJNWd+zthcHxCATJOBpH2pwhb4WLfECQQD/geZ/B6p8WlGb
+amHFhBd/hQN6cq63RGujf3ecz5H+h4RqFyycaVr3t8QZBBd3O3jRB9FCcan2IxRa
+UoYNGNB9AkEA7JQtfmb0p8cTHiDyV6qb8aNJFWipwQVVMmpaXvfC6Aue5uJiyHnx
+iScLsj1ozewCgTvzL7MAsfj0k6qX3c01TQJBAPL2JCdhM8XB4N4Hf+dhHzMcWd1j
+Fi6hOjWjrSsI2owNc2Wqmbo2GNF8BlW/ZUz02YLzixJCoVqzqtPkqyHjGcUCQQDk
+msrbOeFvvo5arrt+uv21oXMdnOVr/xs0fFCXNBLC53fE4z1RO4SKY5CJy41abpR9
+DNERZodlcovjpRTa31CBAkEAw8geqJ1+cfEDZYfJxJigFSwbwoLw6BH+GD4KAEdX
+G1u9SGGYP19eC2mpQei4V5MqAYEbb82bqcebhwg8kAReNQ==
 -----END RSA PRIVATE KEY-----
 `
 
 	PublicKeyRS256String = `-----BEGIN PUBLIC KEY-----
-MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBALxo3PCjFw4QjgOX06QCJIJBnXXNiEYw
-DLxxa5/7QyH6y77nCRQyJ3x3UwF9rUD0RCsp4sNdX5kOQ9PUyHyOtCUCAwEAAQ==
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDsH6T+WrdRLKHEhbhbnItRo7X5
+tj0xssOSCJUiZbCHr52XftIrhBD6HxbGaKUEzuaCDYGEcQZZRJ1KHfYmJtXPCz4Z
+p3qlhjNugvTaZoFtQ8RqiWVYcHqCY6cmI+3cq2mVrd7MstpXKhC8dZ2MZnzx/zqa
+eiV21SiwxHed8LmWmQIDAQAB
 -----END PUBLIC KEY-----
 `
 )
 
 func init() {
-	TokenAuthHS256 = jwtauth.New(jwa.HS256.String(), TokenSecret, nil, jwt.WithAcceptableSkew(30*time.Second))
+	TokenAuthHS256 = jwtauth.New(jwa.HS256().String(), TokenSecret, nil, jwt.WithAcceptableSkew(30*time.Second))
 }
 
 //
@@ -105,17 +113,17 @@ func TestSimpleRSA(t *testing.T) {
 
 	privateKey, err := x509.ParsePKCS1PrivateKey(privateKeyBlock.Bytes)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 
 	publicKeyBlock, _ := pem.Decode([]byte(PublicKeyRS256String))
 
 	publicKey, err := x509.ParsePKIXPublicKey(publicKeyBlock.Bytes)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 
-	TokenAuthRS256 = jwtauth.New(jwa.RS256.String(), privateKey, publicKey)
+	TokenAuthRS256 = jwtauth.New(jwa.RS256().String(), privateKey, publicKey)
 
 	claims := map[string]interface{}{
 		"key":  "val",
@@ -133,9 +141,9 @@ func TestSimpleRSA(t *testing.T) {
 		t.Fatalf("Failed to decode token string %s\n", err.Error())
 	}
 
-	tokenClaims, err := token.AsMap(context.Background())
-	if err != nil {
-		t.Fatal(err.Error())
+	tokenClaims := map[string]interface{}{}
+	if err := transform.AsMap(token, tokenClaims); err != nil {
+		t.Fatalf("Failed to get claims %s\n", err.Error())
 	}
 
 	if !reflect.DeepEqual(claims, tokenClaims) {
@@ -144,7 +152,7 @@ func TestSimpleRSA(t *testing.T) {
 }
 
 func TestSimpleRSAVerifyOnly(t *testing.T) {
-	tokenString := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkiOiJ2YWwiLCJrZXkyIjoidmFsMiIsImtleTMiOiJ2YWwzIn0.kLEK3FZZPsAlQNKR5yHyjRyrlCJFhvKmrh7o-GqDT_zaGQgvb0Dufp8uNSMeOFAlLGK5FbKX7BckjJqfvEyrTQ"
+	tokenString := "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXkiOiJ2YWwiLCJrZXkyIjoidmFsMiIsImtleTMiOiJ2YWwzIn0.IK0G0Qi_c6N6uHRokHMSHQEeYxoi_T73A4RdEzJIfnbs5kA5hF0UhApSWUMZfsTYFNC2buYvWqbyj2kDdXcStpqTUPENGTKvJi66puwhN16BqEOS-jb7kVyf3vWif7XabY0_5S8H_aeqazaj4FemHvWnywJznuMWJRXWw83edpA"
 	claims := map[string]interface{}{
 		"key":  "val",
 		"key2": "val2",
@@ -154,10 +162,10 @@ func TestSimpleRSAVerifyOnly(t *testing.T) {
 	publicKeyBlock, _ := pem.Decode([]byte(PublicKeyRS256String))
 	publicKey, err := x509.ParsePKIXPublicKey(publicKeyBlock.Bytes)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 
-	TokenAuthRS256 = jwtauth.New(jwa.RS256.String(), nil, publicKey)
+	TokenAuthRS256 = jwtauth.New(jwa.RS256().String(), nil, publicKey)
 
 	_, _, err = TokenAuthRS256.Encode(claims)
 	if err == nil {
@@ -169,9 +177,9 @@ func TestSimpleRSAVerifyOnly(t *testing.T) {
 		t.Fatalf("Failed to decode token string %s\n", err.Error())
 	}
 
-	tokenClaims, err := token.AsMap(context.Background())
-	if err != nil {
-		t.Fatal(err.Error())
+	tokenClaims := map[string]interface{}{}
+	if err := transform.AsMap(token, tokenClaims); err != nil {
+		t.Fatalf("Failed to get claims %s\n", err.Error())
 	}
 
 	if !reflect.DeepEqual(claims, tokenClaims) {
@@ -230,42 +238,42 @@ func TestMore(t *testing.T) {
 
 	// sending unauthorized requests
 	if status, resp := testRequest(t, ts, "GET", "/admin", nil, nil); status != 401 || resp != "token is unauthorized\n" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 
 	h := http.Header{}
 	h.Set("Authorization", "BEARER "+newJwtToken([]byte("wrong"), map[string]interface{}{}))
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token is unauthorized\n" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 	h.Set("Authorization", "BEARER asdf")
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token is unauthorized\n" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 	// wrong token secret and wrong alg
 	h.Set("Authorization", "BEARER "+newJwt512Token([]byte("wrong"), map[string]interface{}{}))
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token is unauthorized\n" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 	// correct token secret but wrong alg
 	h.Set("Authorization", "BEARER "+newJwt512Token(TokenSecret, map[string]interface{}{}))
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token is unauthorized\n" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 
 	h = newAuthHeader(map[string]interface{}{"exp": jwtauth.EpochNow() - 1000})
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 401 || resp != "token is expired\n" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 
 	// sending authorized requests
 	if status, resp := testRequest(t, ts, "GET", "/", nil, nil); status != 200 || resp != "welcome" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 
 	h = newAuthHeader((map[string]interface{}{"user_id": 31337, "exp": jwtauth.ExpireIn(5 * time.Minute)}))
 	if status, resp := testRequest(t, ts, "GET", "/admin", h, nil); status != 200 || resp != "protected, user:31337" {
-		t.Fatalf(resp)
+		t.Fatal(resp)
 	}
 }
 
@@ -325,7 +333,7 @@ func newJwtToken(secret []byte, claims ...map[string]interface{}) string {
 		}
 	}
 
-	tokenPayload, err := jwt.Sign(token, jwt.WithKey(jwa.HS256, secret))
+	tokenPayload, err := jwt.Sign(token, jwt.WithKey(jwa.HS256(), secret))
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -340,7 +348,7 @@ func newJwt512Token(secret []byte, claims ...map[string]interface{}) string {
 			token.Set(k, v)
 		}
 	}
-	tokenPayload, err := jwt.Sign(token, jwt.WithKey(jwa.HS512, secret))
+	tokenPayload, err := jwt.Sign(token, jwt.WithKey(jwa.HS512(), secret))
 	if err != nil {
 		log.Fatal(err)
 	}
